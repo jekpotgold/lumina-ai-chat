@@ -17,11 +17,12 @@ import {
   Brain,
   Zap,
   Wand2,
-  Github,
+  Languages,
 } from 'lucide-react'
 import './App.css'
 
 type Role = 'user' | 'assistant' | 'system'
+type Lang = 'id' | 'en'
 
 interface ChatMessage {
   id: string
@@ -46,7 +47,6 @@ type ModelKind = 'text' | 'image'
 interface ModelDef {
   id: string
   name: string
-  tagline: string
   kind: ModelKind
   pollinationsModel?: string
   imageModel?: string
@@ -54,13 +54,23 @@ interface ModelDef {
   temperature?: number
   icon: typeof Brain
   accent: string
+  taglineKey: 'tag_pro' | 'tag_fast' | 'tag_reason' | 'tag_creative' | 'tag_image'
 }
 
 const MODELS: ModelDef[] = [
   {
+    id: 'lumina-pro',
+    name: 'Lumina Pro',
+    taglineKey: 'tag_pro',
+    kind: 'text',
+    pollinationsModel: 'gemini',
+    icon: Sparkles,
+    accent: 'from-violet-400 to-fuchsia-400',
+  },
+  {
     id: 'lumina-fast',
     name: 'Lumina Fast',
-    tagline: 'Cepat & ringan - GPT-OSS 20B',
+    taglineKey: 'tag_fast',
     kind: 'text',
     pollinationsModel: 'openai-fast',
     icon: Zap,
@@ -69,26 +79,17 @@ const MODELS: ModelDef[] = [
   {
     id: 'lumina-reason',
     name: 'Lumina Reason',
-    tagline: 'Penalaran mendalam',
+    taglineKey: 'tag_reason',
     kind: 'text',
     pollinationsModel: 'openai-fast',
     reasoningEffort: 'high',
     icon: Brain,
-    accent: 'from-violet-400 to-fuchsia-400',
-  },
-  {
-    id: 'lumina-gemini',
-    name: 'Lumina Gemini',
-    tagline: 'Multibahasa & kreatif',
-    kind: 'text',
-    pollinationsModel: 'gemini',
-    icon: Sparkles,
     accent: 'from-sky-300 to-emerald-300',
   },
   {
     id: 'lumina-creative',
     name: 'Lumina Creative',
-    tagline: 'Imajinatif - suhu tinggi',
+    taglineKey: 'tag_creative',
     kind: 'text',
     pollinationsModel: 'openai-fast',
     temperature: 1.1,
@@ -98,7 +99,7 @@ const MODELS: ModelDef[] = [
   {
     id: 'lumina-image',
     name: 'Lumina Image',
-    tagline: 'Generator gambar (Flux)',
+    taglineKey: 'tag_image',
     kind: 'image',
     imageModel: 'flux',
     icon: ImageIcon,
@@ -106,23 +107,137 @@ const MODELS: ModelDef[] = [
   },
 ]
 
-const STORAGE_KEY = 'lumina_chat_state_v1'
+const STORAGE_KEY = 'lumina_chat_state_v2'
 
-const SUGGESTED_PROMPTS = [
-  { title: 'Ide bisnis', body: 'Beri 5 ide bisnis online modal kecil yang cocok untuk anak muda Indonesia.' },
-  { title: 'Belajar coding', body: 'Jelaskan async/await di JavaScript dengan analogi sederhana dan contoh kode.' },
-  { title: 'Tulis email', body: 'Bantu saya menulis email permohonan magang yang sopan dan menarik.' },
-  { title: 'Resep cepat', body: 'Sarankan resep makan malam 30 menit dengan ayam dan sayur.' },
-]
+interface Strings {
+  appName: string
+  appSubtitle: string
+  newChat: string
+  chooseModel: string
+  history: string
+  noChats: string
+  deleteAll: string
+  deleteAllConfirm: string
+  delete: string
+  closeMenu: string
+  toggleMenu: string
+  poweredBy: string
+  chatBaru: string
+  helloI: string
+  welcomeSub: string
+  enterToSend: string
+  modelLabel: string
+  placeholderText: (m: string) => string
+  placeholderImage: string
+  send: string
+  sendTitle: string
+  stop: string
+  languageBtn: string
+  disclaimer: string
+  noResponse: string
+  imageError: string
+  error: string
+  suggested: { title: string; body: string }[]
+  tag_pro: string
+  tag_fast: string
+  tag_reason: string
+  tag_creative: string
+  tag_image: string
+}
+
+const I18N: Record<Lang, Strings> = {
+  id: {
+    appName: 'Lumina AI',
+    appSubtitle: 'Chat banyak model gratis',
+    newChat: 'Chat baru',
+    chooseModel: 'Pilih model',
+    history: 'Riwayat',
+    noChats: 'Belum ada chat.',
+    deleteAll: 'Hapus semua',
+    deleteAllConfirm: 'Hapus semua percakapan?',
+    delete: 'Hapus',
+    closeMenu: 'Tutup menu',
+    toggleMenu: 'Toggle menu',
+    poweredBy: 'Powered by Pollinations',
+    chatBaru: 'Chat baru',
+    helloI: 'Halo, saya',
+    welcomeSub: 'Tanyakan apa saja - pilih model di sebelah kiri',
+    enterToSend: 'Tekan Enter untuk kirim, Shift+Enter untuk baris baru',
+    modelLabel: 'Model:',
+    placeholderText: (m: string) => 'Tanyakan ' + m + '...',
+    placeholderImage: 'Deskripsikan gambar yang ingin kamu buat...',
+    send: 'Kirim',
+    sendTitle: 'Kirim (Enter)',
+    stop: 'Berhenti',
+    languageBtn: 'Bahasa',
+    disclaimer: 'AI dapat keliru. Periksa kembali info penting.',
+    noResponse: '_(Tidak ada respons. Coba kirim ulang atau ganti model.)_',
+    imageError: 'Gagal menghasilkan gambar.',
+    error: 'Terjadi kesalahan.',
+    suggested: [
+      { title: 'Ide bisnis', body: 'Beri 5 ide bisnis online modal kecil yang cocok untuk anak muda Indonesia.' },
+      { title: 'Belajar coding', body: 'Jelaskan async/await di JavaScript dengan analogi sederhana dan contoh kode.' },
+      { title: 'Tulis email', body: 'Bantu saya menulis email permohonan magang yang sopan dan menarik.' },
+      { title: 'Resep cepat', body: 'Sarankan resep makan malam 30 menit dengan ayam dan sayur.' },
+    ],
+    tag_pro: 'Default - akurat & seimbang (Gemini)',
+    tag_fast: 'Cepat & ringan',
+    tag_reason: 'Penalaran mendalam',
+    tag_creative: 'Imajinatif - suhu tinggi',
+    tag_image: 'Generator gambar (Flux)',
+  },
+  en: {
+    appName: 'Lumina AI',
+    appSubtitle: 'Free multi-model chat',
+    newChat: 'New chat',
+    chooseModel: 'Choose model',
+    history: 'History',
+    noChats: 'No chats yet.',
+    deleteAll: 'Delete all',
+    deleteAllConfirm: 'Delete all conversations?',
+    delete: 'Delete',
+    closeMenu: 'Close menu',
+    toggleMenu: 'Toggle menu',
+    poweredBy: 'Powered by Pollinations',
+    chatBaru: 'New chat',
+    helloI: "Hi, I'm",
+    welcomeSub: 'Ask anything - pick a model on the left',
+    enterToSend: 'Press Enter to send, Shift+Enter for newline',
+    modelLabel: 'Model:',
+    placeholderText: (m: string) => 'Ask ' + m + '...',
+    placeholderImage: 'Describe the image you want to generate...',
+    send: 'Send',
+    sendTitle: 'Send (Enter)',
+    stop: 'Stop',
+    languageBtn: 'Language',
+    disclaimer: 'AI can make mistakes. Double-check important info.',
+    noResponse: '_(No response. Try resending or switching models.)_',
+    imageError: 'Failed to generate image.',
+    error: 'Something went wrong.',
+    suggested: [
+      { title: 'Business ideas', body: 'Give me 5 low-budget online business ideas suitable for young Indonesians.' },
+      { title: 'Learn coding', body: 'Explain async/await in JavaScript with a simple analogy and code example.' },
+      { title: 'Write email', body: 'Help me write a polite, engaging internship application email.' },
+      { title: 'Quick recipe', body: 'Suggest a 30-minute dinner recipe using chicken and vegetables.' },
+    ],
+    tag_pro: 'Default - balanced & accurate (Gemini)',
+    tag_fast: 'Fast & lightweight',
+    tag_reason: 'Deep reasoning',
+    tag_creative: 'Imaginative - high temp',
+    tag_image: 'Image generator (Flux)',
+  },
+} as const
+
+type T = typeof I18N['id']
 
 function uid() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36)
 }
 
-function newConversation(modelId: string): Conversation {
+function newConversation(modelId: string, title: string): Conversation {
   return {
     id: uid(),
-    title: 'Chat baru',
+    title,
     modelId,
     messages: [],
     createdAt: Date.now(),
@@ -130,23 +245,33 @@ function newConversation(modelId: string): Conversation {
   }
 }
 
-function loadState(): { conversations: Conversation[]; activeId: string | null } {
+interface PersistedState {
+  conversations: Conversation[]
+  activeId: string | null
+  lang: Lang
+}
+
+function loadState(): PersistedState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return { conversations: [], activeId: null }
+    if (!raw) return { conversations: [], activeId: null, lang: 'id' }
     const parsed = JSON.parse(raw)
     if (Array.isArray(parsed.conversations)) {
-      return { conversations: parsed.conversations, activeId: parsed.activeId ?? null }
+      return {
+        conversations: parsed.conversations,
+        activeId: parsed.activeId ?? null,
+        lang: parsed.lang === 'en' ? 'en' : 'id',
+      }
     }
   } catch {
     /* noop */
   }
-  return { conversations: [], activeId: null }
+  return { conversations: [], activeId: null, lang: 'id' }
 }
 
-function saveState(conversations: Conversation[], activeId: string | null) {
+function saveState(state: PersistedState) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ conversations, activeId }))
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
   } catch {
     /* noop */
   }
@@ -163,6 +288,38 @@ function buildImageUrl(prompt: string, model = 'flux') {
     seed: String(seed),
   })
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?${params.toString()}`
+}
+
+function buildSystemPrompt(lang: Lang): string {
+  const today = new Date().toISOString().slice(0, 10)
+  if (lang === 'en') {
+    return [
+      'You are Lumina, a helpful, honest, and concise AI assistant.',
+      'Today is ' + today + '.',
+      'Strict accuracy rules:',
+      '1. If you are not sure or your training data is outdated, say so explicitly instead of guessing.',
+      '2. Never fabricate facts, quotes, statistics, names, dates, URLs, or citations. If you cannot verify something, say "I am not sure".',
+      '3. Distinguish between facts you know with confidence vs. opinions or estimates.',
+      '4. For time-sensitive topics (recent news, prices, current events), warn the user that your knowledge may be outdated.',
+      'Style:',
+      '- Reply in clear English.',
+      '- Use markdown (headings, bullets, tables, code blocks) when it improves readability.',
+      '- Be friendly and respectful.',
+    ].join('\n')
+  }
+  return [
+    'Kamu adalah Lumina, asisten AI yang jujur, jelas, dan to the point.',
+    'Hari ini tanggal ' + today + '.',
+    'Aturan akurasi (penting):',
+    '1. Jika kamu tidak yakin atau data latihanmu sudah lewat, katakan terus terang - jangan menebak.',
+    '2. Jangan mengarang fakta, kutipan, statistik, nama, tanggal, URL, atau referensi. Jika tidak bisa diverifikasi, katakan "saya tidak yakin".',
+    '3. Bedakan mana fakta yang kamu tahu pasti vs opini/perkiraan.',
+    '4. Untuk topik terkini (berita terbaru, harga, event terbaru), ingatkan pengguna bahwa pengetahuanmu mungkin sudah usang.',
+    'Gaya:',
+    '- Balas dalam bahasa Indonesia yang natural dan ramah.',
+    '- Pakai markdown (heading, bullet, tabel, code block) bila membuat jawaban lebih jelas.',
+    '- Sopan dan tidak basa-basi.',
+  ].join('\n')
 }
 
 async function* streamPollinations(
@@ -234,7 +391,7 @@ function PreBlock({ children }: { children: React.ReactNode }) {
         className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition text-xs px-2 py-1 rounded-md bg-white/10 hover:bg-white/20 text-zinc-200 flex items-center gap-1"
       >
         {copied ? <Check size={12} /> : <Copy size={12} />}
-        {copied ? 'Tersalin' : 'Salin'}
+        {copied ? 'Copied' : 'Copy'}
       </button>
       <pre ref={ref}>{children}</pre>
     </div>
@@ -245,10 +402,12 @@ function MessageBubble({
   message,
   modelDef,
   isStreaming,
+  t,
 }: {
   message: ChatMessage
   modelDef: ModelDef | undefined
   isStreaming: boolean
+  t: T
 }) {
   const isUser = message.role === 'user'
   const Icon = modelDef?.icon ?? Sparkles
@@ -263,7 +422,11 @@ function MessageBubble({
             : 'bg-gradient-to-br ' + accent + ' text-zinc-900')
         }
       >
-        {isUser ? <span className="text-[11px] font-semibold">YOU</span> : <Icon size={18} />}
+        {isUser ? (
+          <span className="text-[11px] font-semibold">{t.languageBtn === 'Bahasa' ? 'KAMU' : 'YOU'}</span>
+        ) : (
+          <Icon size={18} />
+        )}
       </div>
       <div className={'max-w-[min(720px,calc(100%-3rem))] ' + (isUser ? 'text-right' : '')}>
         {!isUser && <div className="text-xs text-zinc-500 mb-1">{modelDef?.name ?? 'Lumina'}</div>}
@@ -317,10 +480,12 @@ function ModelCard({
   model,
   selected,
   onClick,
+  tagline,
 }: {
   model: ModelDef
   selected: boolean
   onClick: () => void
+  tagline: string
 }) {
   const Icon = model.icon
   return (
@@ -345,7 +510,7 @@ function ModelCard({
         </span>
         <div className="min-w-0">
           <div className="text-sm font-medium text-zinc-100 truncate">{model.name}</div>
-          <div className="text-[11px] text-zinc-400 truncate">{model.tagline}</div>
+          <div className="text-[11px] text-zinc-400 truncate">{tagline}</div>
         </div>
       </div>
     </button>
@@ -356,6 +521,7 @@ function App() {
   const initial = useMemo(loadState, [])
   const [conversations, setConversations] = useState<Conversation[]>(initial.conversations)
   const [activeId, setActiveId] = useState<string | null>(initial.activeId)
+  const [lang, setLang] = useState<Lang>(initial.lang)
   const [selectedModelId, setSelectedModelId] = useState<string>(MODELS[0].id)
   const [draft, setDraft] = useState('')
   const [streamingId, setStreamingId] = useState<string | null>(null)
@@ -364,6 +530,8 @@ function App() {
   const abortRef = useRef<AbortController | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  const t: T = I18N[lang]
 
   const active = useMemo(
     () => conversations.find((c) => c.id === activeId) ?? null,
@@ -376,8 +544,8 @@ function App() {
   const ActiveIcon = activeModel.icon
 
   useEffect(() => {
-    saveState(conversations, activeId)
-  }, [conversations, activeId])
+    saveState({ conversations, activeId, lang })
+  }, [conversations, activeId, lang])
 
   useEffect(() => {
     const el = scrollRef.current
@@ -390,7 +558,7 @@ function App() {
   }, [])
 
   function startNewConversation(modelId = selectedModelId) {
-    const c = newConversation(modelId)
+    const c = newConversation(modelId, t.chatBaru)
     setConversations((prev) => [c, ...prev])
     setActiveId(c.id)
     setError(null)
@@ -403,7 +571,7 @@ function App() {
   }
 
   function clearAll() {
-    if (!window.confirm('Hapus semua percakapan?')) return
+    if (!window.confirm(t.deleteAllConfirm)) return
     setConversations([])
     setActiveId(null)
   }
@@ -423,6 +591,10 @@ function App() {
     if (window.innerWidth < 768) setSidebarOpen(false)
   }
 
+  function toggleLang() {
+    setLang((l) => (l === 'id' ? 'en' : 'id'))
+  }
+
   async function send() {
     const text = draft.trim()
     if (!text || streamingId) return
@@ -430,7 +602,7 @@ function App() {
 
     let convo = active
     if (!convo) {
-      convo = newConversation(selectedModelId)
+      convo = newConversation(selectedModelId, t.chatBaru)
       const created = convo
       setConversations((prev) => [created, ...prev])
       setActiveId(created.id)
@@ -476,7 +648,7 @@ function App() {
           img.onerror = () => resolve(false)
           img.src = url
         })
-        if (!ok) throw new Error('Gagal menghasilkan gambar.')
+        if (!ok) throw new Error(t.imageError)
         setConversations((prev) =>
           prev.map((c) =>
             c.id === targetId
@@ -491,7 +663,7 @@ function App() {
           ),
         )
       } catch (e) {
-        const msg = e instanceof Error ? e.message : 'Terjadi kesalahan.'
+        const msg = e instanceof Error ? e.message : t.error
         setError(msg)
         setConversations((prev) =>
           prev.map((c) =>
@@ -518,8 +690,7 @@ function App() {
       const history: { role: Role; content: string }[] = [
         {
           role: 'system',
-          content:
-            'Kamu adalah Lumina, asisten AI yang ramah, jujur, dan jelas. Jawab dalam bahasa yang sama dengan pengguna. Format jawaban dengan markdown jika berguna.',
+          content: buildSystemPrompt(lang),
         },
         ...convo.messages
           .filter((m) => m.content && !(m.role === 'assistant' && m.id === assistantMsg.id))
@@ -550,9 +721,7 @@ function App() {
               ? {
                   ...c,
                   messages: c.messages.map((m) =>
-                    m.id === assistantMsg.id
-                      ? { ...m, content: '_(Tidak ada respons. Coba kirim ulang atau ganti model.)_' }
-                      : m,
+                    m.id === assistantMsg.id ? { ...m, content: t.noResponse } : m,
                   ),
                 }
               : c,
@@ -563,7 +732,7 @@ function App() {
       if ((e as { name?: string })?.name === 'AbortError') {
         // user stopped
       } else {
-        const msg = e instanceof Error ? e.message : 'Terjadi kesalahan.'
+        const msg = e instanceof Error ? e.message : t.error
         setError(msg)
         setConversations((prev) =>
           prev.map((c) =>
@@ -612,13 +781,13 @@ function App() {
               <Sparkles size={18} className="text-zinc-900" />
             </div>
             <div className="flex-1">
-              <div className="text-sm font-semibold tracking-tight">Lumina AI</div>
-              <div className="text-[11px] text-zinc-400">Chat banyak model gratis</div>
+              <div className="text-sm font-semibold tracking-tight">{t.appName}</div>
+              <div className="text-[11px] text-zinc-400">{t.appSubtitle}</div>
             </div>
             <button
               onClick={() => setSidebarOpen(false)}
               className="md:hidden p-1.5 rounded-md hover:bg-white/10"
-              aria-label="Tutup menu"
+              aria-label={t.closeMenu}
             >
               <X size={16} />
             </button>
@@ -629,12 +798,12 @@ function App() {
               onClick={() => startNewConversation()}
               className="btn-shine w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-white text-zinc-900 hover:bg-zinc-100 text-sm font-medium transition shadow-md"
             >
-              <Plus size={16} /> Chat baru
+              <Plus size={16} /> {t.newChat}
             </button>
           </div>
 
           <div className="px-3 pb-2 text-[11px] uppercase tracking-wider text-zinc-500">
-            Pilih model
+            {t.chooseModel}
           </div>
           <div className="px-3 grid gap-1.5">
             {MODELS.map((m) => (
@@ -643,17 +812,18 @@ function App() {
                 model={m}
                 selected={(active?.modelId ?? selectedModelId) === m.id}
                 onClick={() => selectModel(m.id)}
+                tagline={t[m.taglineKey]}
               />
             ))}
           </div>
 
           <div className="px-3 pt-4 pb-2 text-[11px] uppercase tracking-wider text-zinc-500 flex items-center justify-between">
-            <span>Riwayat</span>
+            <span>{t.history}</span>
             {conversations.length > 0 && (
               <button
                 onClick={clearAll}
                 className="text-zinc-500 hover:text-rose-300 transition"
-                title="Hapus semua"
+                title={t.deleteAll}
               >
                 <Trash2 size={12} />
               </button>
@@ -661,7 +831,7 @@ function App() {
           </div>
           <div className="flex-1 overflow-y-auto thin-scroll px-2 pb-3">
             {conversations.length === 0 ? (
-              <div className="text-xs text-zinc-500 px-2 py-3">Belum ada chat.</div>
+              <div className="text-xs text-zinc-500 px-2 py-3">{t.noChats}</div>
             ) : (
               conversations.map((c) => {
                 const m = MODELS.find((mm) => mm.id === c.modelId)
@@ -676,7 +846,7 @@ function App() {
                   >
                     <MessageSquare size={14} className="text-zinc-500 shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm truncate">{c.title || 'Chat baru'}</div>
+                      <div className="text-sm truncate">{c.title || t.chatBaru}</div>
                       <div className="text-[10px] text-zinc-500 truncate">{m?.name ?? 'Model'}</div>
                     </div>
                     <button
@@ -685,7 +855,7 @@ function App() {
                         deleteConversation(c.id)
                       }}
                       className="opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-rose-300 p-1 rounded-md"
-                      aria-label="Hapus"
+                      aria-label={t.delete}
                     >
                       <Trash2 size={12} />
                     </button>
@@ -696,15 +866,8 @@ function App() {
           </div>
 
           <div className="border-t border-white/5 px-4 py-3 text-[11px] text-zinc-500 flex items-center justify-between">
-            <span>v1.0</span>
-            <a
-              href="https://pollinations.ai"
-              target="_blank"
-              rel="noreferrer"
-              className="hover:text-zinc-300 transition flex items-center gap-1"
-            >
-              Powered by Pollinations
-            </a>
+            <span>v1.1</span>
+            <span>{t.poweredBy}</span>
           </div>
         </div>
       </aside>
@@ -714,7 +877,7 @@ function App() {
           <button
             onClick={() => setSidebarOpen((s) => !s)}
             className="p-2 rounded-lg hover:bg-white/10 transition"
-            aria-label="Toggle menu"
+            aria-label={t.toggleMenu}
           >
             <Menu size={18} />
           </button>
@@ -730,18 +893,21 @@ function App() {
             </div>
             <div className="min-w-0">
               <div className="text-sm font-medium truncate">{activeModel.name}</div>
-              <div className="text-[11px] text-zinc-400 truncate">{activeModel.tagline}</div>
+              <div className="text-[11px] text-zinc-400 truncate">{t[activeModel.taglineKey]}</div>
             </div>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <a
-              href="https://github.com/jekpotgold"
-              target="_blank"
-              rel="noreferrer"
-              className="hidden sm:inline-flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-100 px-2.5 py-1.5 rounded-lg hover:bg-white/5 transition"
+            <button
+              onClick={toggleLang}
+              className="inline-flex items-center gap-1.5 text-xs text-zinc-300 hover:text-white px-2.5 py-1.5 rounded-lg border border-white/10 hover:border-white/25 hover:bg-white/5 transition"
+              title={t.languageBtn}
+              aria-label={t.languageBtn}
             >
-              <Github size={14} /> GitHub
-            </a>
+              <Languages size={14} />
+              <span className="font-semibold">{lang === 'id' ? 'ID' : 'EN'}</span>
+              <span className="text-zinc-500">/</span>
+              <span className="text-zinc-500">{lang === 'id' ? 'EN' : 'ID'}</span>
+            </button>
           </div>
         </header>
 
@@ -755,19 +921,17 @@ function App() {
                   </div>
                   <div>
                     <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
-                      Halo, saya{' '}
+                      {t.helloI}{' '}
                       <span className="bg-gradient-to-r from-violet-300 via-fuchsia-300 to-rose-300 bg-clip-text text-transparent">
                         Lumina
                       </span>
                     </h1>
-                    <p className="text-sm text-zinc-400">
-                      Tanyakan apa saja - pilih model di sebelah kiri
-                    </p>
+                    <p className="text-sm text-zinc-400">{t.welcomeSub}</p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-6">
-                  {SUGGESTED_PROMPTS.map((p) => (
+                  {t.suggested.map((p) => (
                     <button
                       key={p.title}
                       onClick={() => {
@@ -789,6 +953,7 @@ function App() {
                   message={m}
                   modelDef={MODELS.find((md) => md.id === (m.modelId ?? active.modelId))}
                   isStreaming={streamingId === m.id}
+                  t={t}
                 />
               ))
             )}
@@ -812,9 +977,7 @@ function App() {
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={onKeyDown}
                 placeholder={
-                  activeModel.kind === 'image'
-                    ? 'Deskripsikan gambar yang ingin kamu buat...'
-                    : 'Tanyakan ' + activeModel.name + '...'
+                  activeModel.kind === 'image' ? t.placeholderImage : t.placeholderText(activeModel.name)
                 }
                 rows={1}
                 className="auto flex-1 bg-transparent outline-none text-sm md:text-[15px] text-zinc-100 placeholder:text-zinc-500 max-h-44 py-2"
@@ -823,8 +986,8 @@ function App() {
                 <button
                   onClick={stop}
                   className="shrink-0 p-2.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-200 transition"
-                  aria-label="Berhenti"
-                  title="Berhenti"
+                  aria-label={t.stop}
+                  title={t.stop}
                 >
                   <Square size={16} />
                 </button>
@@ -838,17 +1001,17 @@ function App() {
                       ? 'bg-gradient-to-br from-violet-400 to-fuchsia-500 text-zinc-900 hover:brightness-110'
                       : 'bg-white/5 text-zinc-500 cursor-not-allowed')
                   }
-                  aria-label="Kirim"
-                  title="Kirim (Enter)"
+                  aria-label={t.send}
+                  title={t.sendTitle}
                 >
                   <Send size={16} />
                 </button>
               )}
             </div>
-            <div className="mt-2 px-1 text-[11px] text-zinc-500 flex items-center justify-between">
-              <span>Tekan Enter untuk kirim, Shift+Enter untuk baris baru</span>
-              <span className="hidden md:inline">
-                Model: <span className="text-zinc-300">{activeModel.name}</span>
+            <div className="mt-2 px-1 text-[11px] text-zinc-500 flex items-center justify-between gap-3">
+              <span className="truncate">{t.disclaimer}</span>
+              <span className="hidden md:inline shrink-0">
+                {t.modelLabel} <span className="text-zinc-300">{activeModel.name}</span>
               </span>
             </div>
           </div>
