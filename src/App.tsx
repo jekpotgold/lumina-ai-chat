@@ -222,7 +222,7 @@ const I18N: Record<Lang, Strings> = {
       { title: 'Write email', body: 'Help me write a polite, engaging internship application email.' },
       { title: 'Quick recipe', body: 'Suggest a 30-minute dinner recipe using chicken and vegetables.' },
     ],
-    tag_pro: 'Default - balanced & accurate (Gemini)',
+    tag_pro: 'Default - balanced & careful',
     tag_fast: 'Fast & lightweight',
     tag_reason: 'Deep reasoning',
     tag_creative: 'Imaginative - high temp',
